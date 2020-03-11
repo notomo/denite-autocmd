@@ -12,12 +12,10 @@ class Source(Base):
     FILE_TYPE_KEY = "file_type"
     CMD_KEY = "cmd"
     FILE_PATH_KEY = "file_path"
+    LINE_NUMBER_KEY = "line_number"
 
     NONE_GROUP_NAME = "None_Group"
     WORD_FORMAT = "{group} {event} {file_type} {cmd}"
-    PATTERN_FORMAT = (
-        "\\v^\\s*\\zs(\\S+\\s+)*(\\S+,)?{event}(,\\S+)?\\s+{file_type}\\s+{cmd}"
-    )
 
     event_pattern = re.compile("^(?P<{event}>\\S+)$".format(event=EVENT_KEY))
     group_event_pattern = re.compile(
@@ -35,7 +33,9 @@ class Source(Base):
     )
     cmd_pattern = re.compile("^              (?P<{cmd}>.+)".format(cmd=CMD_KEY))
     file_path_pattern = re.compile(
-        "^\\t(\\S+ )+(?P<{file_path}>\\S+)$".format(file_path=FILE_PATH_KEY)
+        "^\\t(\\S+ )+(?P<{file_path}>\\S+)\\s+line\\s+(?P<{line_number}>\\d+)$".format(
+            file_path=FILE_PATH_KEY, line_number=LINE_NUMBER_KEY
+        )
     )
 
     escape = str.maketrans(
@@ -90,11 +90,7 @@ class Source(Base):
                     cmd=autocmd.cmd,
                 ),
                 "action__path": autocmd.file_path,
-                "action__pattern": self.PATTERN_FORMAT.format(
-                    event=autocmd.event_name.translate(self.escape),
-                    file_type=autocmd.file_type.translate(self.escape),
-                    cmd=autocmd.cmd.translate(self.escape),
-                ),
+                "action__line": autocmd.line_number,
             }
             for autocmd in self.autocmd_groups.get_autocmds()
         ]
@@ -146,26 +142,32 @@ class Source(Base):
         self.current_cmd = match_result.group(self.CMD_KEY)
         match_result = self.file_path_pattern.match(next(line_generator))
         if match_result:
-            self.parse_file_path(match_result)
+            self.parse_position(match_result)
 
     def parse_file_type_cmd(self, match_result, line_generator):
         self.current_file_type = match_result.group(self.FILE_TYPE_KEY)
         self.parse_cmd(match_result, line_generator)
 
-    def parse_file_path(self, match_result):
+    def parse_position(self, match_result):
         file_path = match_result.group(self.FILE_PATH_KEY)
+        line_number = match_result.group(self.LINE_NUMBER_KEY)
         self.autocmd_groups.add_autocmd(
             self.current_group_name,
             self.current_event_name,
             self.current_file_type,
             self.current_cmd,
             file_path,
+            line_number,
         )
 
 
 class AutocmdGroups(UserDict):
-    def add_autocmd(self, group_name, event_name, file_type, cmd, file_path):
-        autocmd = Autocmd(group_name, event_name, file_type, cmd, file_path)
+    def add_autocmd(
+        self, group_name, event_name, file_type, cmd, file_path, line_number
+    ):
+        autocmd = Autocmd(
+            group_name, event_name, file_type, cmd, file_path, line_number
+        )
         try:
             autocmd_group = self[group_name]
         except KeyError:
@@ -196,9 +198,10 @@ class AutocmdGroup(UserDict):
 
 
 class Autocmd(object):
-    def __init__(self, group_name, event_name, file_type, cmd, file_path):
+    def __init__(self, group_name, event_name, file_type, cmd, file_path, line_number):
         self.group_name = group_name
         self.event_name = event_name
         self.file_type = file_type
         self.cmd = cmd
         self.file_path = file_path
+        self.line_number = line_number
