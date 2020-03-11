@@ -1,86 +1,103 @@
-from .base import Base
 import re
 from collections import UserDict
 from itertools import chain
 
+from .base import Base
+
 
 class Source(Base):
 
-    EVENT_KEY = 'event'
-    GROUP_KEY = 'group'
-    FILE_TYPE_KEY = 'file_type'
-    CMD_KEY = 'cmd'
-    FILE_PATH_KEY = 'file_path'
+    EVENT_KEY = "event"
+    GROUP_KEY = "group"
+    FILE_TYPE_KEY = "file_type"
+    CMD_KEY = "cmd"
+    FILE_PATH_KEY = "file_path"
 
-    NONE_GROUP_NAME = 'None_Group'
-    WORD_FORMAT = '{group} {event} {file_type} {cmd}'
-    PATTERN_FORMAT = '\\v^\s*\zs(\S+\s+)*(\S+,)?{event}(,\S+)?\s+{file_type}\s+{cmd}'
+    NONE_GROUP_NAME = "None_Group"
+    WORD_FORMAT = "{group} {event} {file_type} {cmd}"
+    PATTERN_FORMAT = (
+        "\\v^\\s*\\zs(\\S+\\s+)*(\\S+,)?{event}(,\\S+)?\\s+{file_type}\\s+{cmd}"
+    )
 
-    event_pattern = re.compile('^(?P<{event}>\S+)$'.format(event=EVENT_KEY))
-    group_event_pattern = re.compile('^(?P<{group}>\S+)\s+(?P<{event}>\w+)'.format(group=GROUP_KEY, event=EVENT_KEY))
-    file_type_cmd_pattern = re.compile('^    (?P<{file_type}>\S+)\s+(?P<{cmd}>.+)'.format(file_type=FILE_TYPE_KEY, cmd=CMD_KEY))
-    file_type_pattern = re.compile('^    (?P<{file_type}>\S+)$'.format(file_type=FILE_TYPE_KEY))
-    cmd_pattern = re.compile('^              (?P<{cmd}>.+)'.format(cmd=CMD_KEY))
-    file_path_pattern = re.compile('^\t(\S+ )+(?P<{file_path}>\S+)$'.format(file_path=FILE_PATH_KEY))
+    event_pattern = re.compile("^(?P<{event}>\\S+)$".format(event=EVENT_KEY))
+    group_event_pattern = re.compile(
+        "^(?P<{group}>\\S+)\\s+(?P<{event}>\\w+)".format(
+            group=GROUP_KEY, event=EVENT_KEY
+        )
+    )
+    file_type_cmd_pattern = re.compile(
+        "^    (?P<{file_type}>\\S+)\\s+(?P<{cmd}>.+)".format(
+            file_type=FILE_TYPE_KEY, cmd=CMD_KEY
+        )
+    )
+    file_type_pattern = re.compile(
+        "^    (?P<{file_type}>\\S+)$".format(file_type=FILE_TYPE_KEY)
+    )
+    cmd_pattern = re.compile("^              (?P<{cmd}>.+)".format(cmd=CMD_KEY))
+    file_path_pattern = re.compile(
+        "^\\t(\\S+ )+(?P<{file_path}>\\S+)$".format(file_path=FILE_PATH_KEY)
+    )
 
     escape = str.maketrans(
         {
-            '*': '\*',
-            '.': '\.',
-            '(': '\(',
-            ')': '\)',
-            '|': '\|',
-            '&': '\&',
-            '=': '\=',
-            '<': '\<',
-            '>': '\>',
-            '{': '\{',
-            '}': '\}',
-            '%': '\%',
-            '+': '\+',
-            '/': '\/',
-            '$': '\$',
-            '^': '\^',
-            '@': '\@',
-            '?': '\?',
-            '~': '\~',
+            "*": "\\*",
+            ".": "\\.",
+            "(": "\\(",
+            ")": "\\)",
+            "|": "\\|",
+            "&": "\\&",
+            "=": "\\=",
+            "<": "\\<",
+            ">": "\\>",
+            "{": "\\{",
+            "}": "\\}",
+            "%": "\\%",
+            "+": "\\+",
+            "/": "\\/",
+            "$": "\\$",
+            "^": "\\^",
+            "@": "\\@",
+            "?": "\\?",
+            "~": "\\~",
         }
     )
 
     def __init__(self, vim):
         super().__init__(vim)
 
-        self.name = 'autocmd'
-        self.kind = 'file'
-        self.matchers = ['matcher_regexp']
+        self.name = "autocmd"
+        self.kind = "file"
+        self.matchers = ["matcher_regexp"]
         self.sorters = []
 
-        self.current_group_name = ''
-        self.current_event_name = ''
-        self.current_file_type = ''
-        self.current_cmd = ''
+        self.current_group_name = ""
+        self.current_event_name = ""
+        self.current_file_type = ""
+        self.current_cmd = ""
 
     def gather_candidates(self, context):
-        autocmd_result = self.vim.call('denite_autocmd#util#redir', 'verbose autocmd')
+        autocmd_result = self.vim.call("denite_autocmd#util#redir", "verbose autocmd")
         self.autocmd_groups = AutocmdGroups()
-        self.parse((x for x in autocmd_result.split('\n')[1:]))
+        self.parse((x for x in autocmd_result.split("\n")[1:]))
         return [
             {
-                'word': self.WORD_FORMAT.format(
-                    group=autocmd.group_name if autocmd.group_name != '' else self.NONE_GROUP_NAME,
+                "word": self.WORD_FORMAT.format(
+                    group=autocmd.group_name
+                    if autocmd.group_name != ""
+                    else self.NONE_GROUP_NAME,
                     event=autocmd.event_name,
                     file_type=autocmd.file_type,
                     cmd=autocmd.cmd,
                 ),
-                'action__path': autocmd.file_path,
-                'action__pattern': self.PATTERN_FORMAT.format(
+                "action__path": autocmd.file_path,
+                "action__pattern": self.PATTERN_FORMAT.format(
                     event=autocmd.event_name.translate(self.escape),
                     file_type=autocmd.file_type.translate(self.escape),
-                    cmd=autocmd.cmd.translate(self.escape)
+                    cmd=autocmd.cmd.translate(self.escape),
                 ),
-            } for autocmd in self.autocmd_groups.get_autocmds()
+            }
+            for autocmd in self.autocmd_groups.get_autocmds()
         ]
-
 
     def parse(self, line_generator):
         while True:
@@ -110,10 +127,10 @@ class Source(Base):
                 break
 
     def parse_event(self, match_result):
-        self.current_group_name = ''
+        self.current_group_name = ""
         self.current_event_name = match_result.group(self.EVENT_KEY)
-        self.current_file_type = ''
-        self.current_cmd = ''
+        self.current_file_type = ""
+        self.current_cmd = ""
 
     def parse_group_event(self, match_result):
         self.parse_event(match_result)
@@ -137,11 +154,16 @@ class Source(Base):
 
     def parse_file_path(self, match_result):
         file_path = match_result.group(self.FILE_PATH_KEY)
-        self.autocmd_groups.add_autocmd(self.current_group_name, self.current_event_name, self.current_file_type, self.current_cmd, file_path)
+        self.autocmd_groups.add_autocmd(
+            self.current_group_name,
+            self.current_event_name,
+            self.current_file_type,
+            self.current_cmd,
+            file_path,
+        )
 
 
 class AutocmdGroups(UserDict):
-
     def add_autocmd(self, group_name, event_name, file_type, cmd, file_path):
         autocmd = Autocmd(group_name, event_name, file_type, cmd, file_path)
         try:
@@ -160,7 +182,6 @@ class AutocmdGroups(UserDict):
 
 
 class AutocmdGroup(UserDict):
-
     def __init__(self, group_name):
         super().__init__()
         self.group_name = group_name
@@ -175,11 +196,9 @@ class AutocmdGroup(UserDict):
 
 
 class Autocmd(object):
-
     def __init__(self, group_name, event_name, file_type, cmd, file_path):
         self.group_name = group_name
         self.event_name = event_name
         self.file_type = file_type
         self.cmd = cmd
         self.file_path = file_path
-
