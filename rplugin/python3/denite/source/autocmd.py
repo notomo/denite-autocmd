@@ -66,7 +66,7 @@ class Source(Base):
         super().__init__(vim)
 
         self.name = "autocmd"
-        self.kind = "file"
+        self.kind = "autocmd"
         self.matchers = ["matcher_regexp"]
         self.sorters = []
 
@@ -79,21 +79,28 @@ class Source(Base):
         autocmd_result = self.vim.call("denite_autocmd#util#redir", "verbose autocmd")
         self.autocmd_groups = AutocmdGroups()
         self.parse((x for x in autocmd_result.split("\n")[1:]))
-        return [
-            {
+
+        def create(autocmd):
+            group = (
+                autocmd.group_name if autocmd.group_name != "" else self.NONE_GROUP_NAME
+            )
+            event = autocmd.event_name
+            # FIXME s/file_type/pattern/g
+            pattern = autocmd.file_type
+            cmd = autocmd.cmd
+            return {
                 "word": self.WORD_FORMAT.format(
-                    group=autocmd.group_name
-                    if autocmd.group_name != ""
-                    else self.NONE_GROUP_NAME,
-                    event=autocmd.event_name,
-                    file_type=autocmd.file_type,
-                    cmd=autocmd.cmd,
+                    group=group, event=event, file_type=pattern, cmd=cmd
                 ),
                 "action__path": autocmd.file_path,
                 "action__line": autocmd.line_number,
+                "action__autocmd_group": group,
+                "action__autocmd_event": event,
+                "action__autocmd_pattern": pattern,
+                "action__autocmd_cmd": cmd,
             }
-            for autocmd in self.autocmd_groups.get_autocmds()
-        ]
+
+        return [create(autocmd) for autocmd in self.autocmd_groups.get_autocmds()]
 
     def parse(self, line_generator):
         while True:
