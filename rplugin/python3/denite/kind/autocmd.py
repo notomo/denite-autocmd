@@ -16,3 +16,6 @@ class Kind(File):
             event = target["action__autocmd_event"]
             pattern = target["action__autocmd_pattern"]
             self.vim.command(f"autocmd! {group} {event} {pattern}")
+
+    def action_delete(self, context):
+        self.action_remove(context)
